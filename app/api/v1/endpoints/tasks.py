@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.models.task import Task, TaskStatus
@@ -6,7 +6,7 @@ from app.schemas.task import TaskCreate, TaskResponse, TaskComplete
 from app.services.database import get_db
 from app.api.v1.endpoints.auth import get_current_user  # ← Import the bouncer
 from app.models.user import User
-
+from sqlalchemy import func, case
 router = APIRouter()
 
 # CREATE TASK (Auto-injects author_id from JWT)
@@ -70,7 +70,7 @@ def complete_task(
     # 2. Update task
     task.status = TaskStatus.complete
     task.image_url = complete_data.image_url
-    task.completed_at = datetime.utcnow()
+    task.completed_at = datetime.now(timezone.utc)
     
     db.commit()
     db.refresh(task)
@@ -98,3 +98,76 @@ def archive_task(
     db.commit()
     db.refresh(task)
     return task
+
+@router.get("/tasks/calendar", response_model=list[TaskResponse])
+def get_calendar_tasks(
+    start_date: str,
+    end_date: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    try:
+        start_dt = datetime.strptime(start_date, "%d-%m-%Y")
+        end_dt = datetime.strptime(end_date, "%d-%m-%Y")
+
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use DD-MM-YYYY.")
+    
+    return(
+        db.query(Task)
+        .filter(
+            Task.author_id == current_user.id,
+            Task.due_date.between(start_dt, end_dt),
+            Task.status != TaskStatus.archived
+        )
+        .order_by(Task.due_date.asc())
+        .all()
+    )
+
+@router.get("/tasks/stats")
+def get_task_stats(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    month_end = (month_start.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(seconds=1)
+    stats = db.query(
+        func.count(case((Task.status == TaskStatus.pending, 1))).label("pending"),
+        func.count(case((Task.status == TaskStatus.in_progress, 1))).label("in_progress"),
+        func.count(case((Task.status == TaskStatus.complete, 1))).label("complete"),
+        func.count(case((Task.status == TaskStatus.archived, 1))).label("archived"),
+        func.count(Task.id).label("total")
+    ).filter(
+        Task.author_id == current_user.id,
+        Task.created_at >= month_start,
+        Task.created_at <= month_end
+    ).first()
+    
+    return {
+        "pending": stats.pending,
+        "in_progress": stats.in_progress,
+        "complete": stats.complete,
+        "archived": stats.archived,
+        "total": stats.total,
+        "period": f"{month_start.strftime('%B-%Y')} to {month_end.strftime('%B-%Y')}"
+    }
+
+@router.get("/tasks/memory", response_model=list[TaskResponse])
+def get_task_memory(
+    skip: int = 0,
+    limit: int = 20,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return (
+        db.query(Task)
+        .filter(
+            Task.author_id == current_user.id,
+            Task.status.in_([TaskStatus.complete, TaskStatus.archived])
+        )
+        .order_by(Task.completed_at.desc(), Task.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
