@@ -25,7 +25,7 @@ async def upload_media(
     contents = await file.read()
     if len(contents) > MAX_FILE_SIZE:
         raise HTTPException(status_code=400, detail="File too large (max 5 MB)")
-
+    
     # 3. Generate unique filename
     ext = os.path.splitext(file.filename)[1]  # Get original file extension
     safe_name = f"{current_user.id}_{int(datetime.utcnow().timestamp())}_{uuid.uuid4().hex[:8]}{ext}"
@@ -37,8 +37,8 @@ async def upload_media(
     # 5. Save the file to disk
     file_path = os.path.join(user_dir, safe_name)
     with open(file_path, "wb") as buffer:
-        buffer.write(contents)
-
+        buffer.write(await file.read())
+    
     # 6. Return the URL or path to the uploaded media
-    media_url = f"/{UPLOAD_DIR}/{safe_name}"  # Adjust as needed for your static files setup
-    return JSONResponse(content={"media_url": media_url})
+    file_url = f"/{UPLOAD_DIR}/{current_user.id}/{safe_name}"  # Adjust as needed for your static files setup
+    return JSONResponse(content={"file_url": file_url,"size_bytes": len(contents),"content_type": file.content_type })
