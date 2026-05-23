@@ -1,166 +1,211 @@
-#GENERATED CODE - NOT MINE XD
 import streamlit as st
 import requests
-from datetime import datetime, timedelta
-import os
+import json
+from datetime import datetime
 
-# 🌐 API Configuration
-API_URL = os.getenv("API_URL", "http://127.0.0.1:8000/api/v1")
+# ─────────────────────────────────────
+# CONFIGURATION
+# ─────────────────────────────────────
+API_BASE_URL = st.secrets.get("API_BASE_URL", "http://127.0.0.1:8000/api/v1")
 
-st.set_page_config(page_title="EHTMS Dashboard", layout="wide")
-st.title("️ EHTMS Task Command Center")
+st.set_page_config(
+    page_title="EHTMS Admin Dashboard",
+    page_icon="🏢",
+    layout="wide"
+)
 
-# 🔐 Auth State
+# ─────────────────────────────────────
+# SESSION STATE
+# ─────────────────────────────────────
 if "token" not in st.session_state:
     st.session_state.token = None
-if "user" not in st.session_state:
-    st.session_state.user = None
+if "user_info" not in st.session_state:
+    st.session_state.user_info = None
 
-# 🔹 Helper: Auth Headers
-def auth_headers():
+# ─────────────────────────────────────
+# AUTHENTICATION HELPERS
+# ─────────────────────────────────────
+def login(email: str, password: str):
+    """Authenticate and store JWT token"""
+    response = requests.post(
+        f"{API_BASE_URL}/auth/login",
+        data={"username": email, "password": password}
+    )
+    if response.status_code == 200:
+        data = response.json()
+        st.session_state.token = data["access_token"]
+        st.session_state.user_info = {"email": email}
+        return True
+    else:
+        st.error(f"Login failed: {response.json().get('detail', 'Unknown error')}")
+        return False
+
+def logout():
+    """Clear session"""
+    st.session_state.token = None
+    st.session_state.user_info = None
+    st.rerun()
+
+def get_headers():
+    """Return auth headers for API requests"""
     return {"Authorization": f"Bearer {st.session_state.token}"} if st.session_state.token else {}
 
-# 🔹 Login/Register Tab
-if not st.session_state.token:
-    tab1, tab2 = st.tabs(["🔑 Login", " Register"])
+# ─────────────────────────────────────
+# UI COMPONENTS
+# ─────────────────────────────────────
+def login_page():
+    """Login UI"""
+    st.title("🏢 EHTMS Admin Dashboard")
+    st.markdown("### Sign In")
     
-    with tab1:
-        email = st.text_input("Email")
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        email = st.text_input("Email", placeholder="admin@ehtms.local")
         password = st.text_input("Password", type="password")
-        if st.button("Login"):
-            try:
-                res = requests.post(f"{API_URL}/auth/login", json={"email": email, "password": password})
-                if res.status_code == 200:
-                    st.session_state.token = res.json()["access_token"]
-                    st.session_state.user = email
+        
+        if st.button("Login", type="primary", use_container_width=True):
+            if login(email, password):
+                st.rerun()
+
+def sidebar():
+    """Navigation sidebar"""
+    with st.sidebar:
+        st.title(f"👤 {st.session_state.user_info.get('email', 'User')}")
+        
+        if st.button("Logout", use_container_width=True):
+            logout()
+        
+        st.divider()
+        menu = st.radio(
+            "Navigation",
+            ["📊 Dashboard", "🏢 Organizations", "👥 Users", "📋 Tasks"],
+            index=0
+        )
+        return menu
+
+# ─────────────────────────────────────
+# PAGES
+# ─────────────────────────────────────
+def dashboard_page():
+    """Overview dashboard"""
+    st.title("📊 Dashboard")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Organizations", "Loading...")
+    with col2:
+        st.metric("Total Users", "Loading...")
+    with col3:
+        st.metric("Active Tasks", "Loading...")
+    with col4:
+        st.metric("Completed Tasks", "Loading...")
+    
+    st.info("🚀 Dashboard statistics will be populated after API integration.")
+
+def organizations_page():
+    """Organization management (Super Admin only)"""
+    st.title("🏢 Organizations")
+    
+    # Create new organization
+    with st.expander("➕ Create New Organization"):
+        org_name = st.text_input("Organization Name")
+        if st.button("Create Organization"):
+            if org_name:
+                response = requests.post(
+                    f"{API_BASE_URL}/org/org",
+                    json={"name": org_name},
+                    headers=get_headers()
+                )
+                if response.status_code == 201:
+                    st.success(f"Organization '{org_name}' created!")
                     st.rerun()
                 else:
-                    st.error(res.json().get("detail", "Login failed"))
-            except Exception as e:
-                st.error(f"API Error: {e}")
+                    st.error(f"Error: {response.json().get('detail', 'Unknown error')}")
+    
+    # List organizations (placeholder)
+    st.subheader("Existing Organizations")
+    st.write("Organizations will be listed here after API integration.")
 
-    with tab2:
-        r_email = st.text_input("Email", key="reg_email")
-        r_user = st.text_input("Username", key="reg_user")
-        r_pass = st.text_input("Password", type="password", key="reg_pass")
-        if st.button("Register"):
-            try:
-                res = requests.post(f"{API_URL}/auth/register", json={"email": r_email, "username": r_user, "password": r_pass})
-                if res.status_code == 201:
-                    st.success("Registered! Switch to Login tab.")
-                else:
-                    st.error(res.json().get("detail", "Registration failed"))
-            except Exception as e:
-                st.error(f"API Error: {e}")
-
-else:
-    #  Authenticated Dashboard
-    col1, col2 = st.columns([4, 1])
-    with col1: st.subheader(f"Welcome, {st.session_state.user}")
-    with col2:
-        if st.button("🚪 Logout"):
-            st.session_state.token = None
-            st.session_state.user = None
-            st.rerun()
-
-    tabs = st.tabs(["📋 Tasks", " Calendar", "📊 Stats", "️ Memory", "📤 Upload & Complete"])
-
-    with tabs[0]:  # 📋 Tasks
-        status_filter = st.selectbox("Filter by Status", ["all", "pending", "in_progress", "completed", "archived"])
-        if st.button(" Refresh Tasks"):
-            try:
-                params = {"status_filter": status_filter} if status_filter != "all" else {}
-                res = requests.get(f"{API_URL}/tasks", headers=auth_headers(), params=params)
-                if res.status_code == 200:
-                    tasks = res.json()
-                    for t in tasks:
-                        st.markdown(f"**{t['title']}** | `{t['status']}` | Due: `{t.get('due_date','N/A')}` | ID: `{t['id']}`")
-                else:
-                    st.error("Failed to fetch tasks")
-            except Exception as e:
-                st.error(f"API Error: {e}")
+def users_page():
+    """User management"""
+    st.title("👥 User Management")
+    
+    tab1, tab2 = st.tabs(["➕ Create User", "📋 User List"])
+    
+    with tab1:
+        st.subheader("Create New User")
+        col1, col2 = st.columns(2)
+        with col1:
+            email = st.text_input("Email")
+            username = st.text_input("Username")
+        with col2:
+            password = st.text_input("Password", type="password")
+            role = st.selectbox("Role", ["worker", "manager", "org_admin"])
         
-        with st.expander("➕ Create New Task"):
-            t_title = st.text_input("Title")
-            t_desc = st.text_area("Description")
-            t_due = st.date_input("Due Date", datetime.now() + timedelta(days=7))
-            if st.button("Create Task"):
-                try:
-                    res = requests.post(f"{API_URL}/tasks", headers=auth_headers(), 
-                                        json={"title": t_title, "description": t_desc, "due_date": t_due.isoformat()})
-                    if res.status_code == 201:
-                        st.success("Task created!")
-                    else:
-                        st.error(res.json().get("detail", "Create failed"))
-                except Exception as e:
-                    st.error(f"API Error: {e}")
+        if st.button("Create User"):
+            if email and username and password:
+                # This would call your registration or admin user creation endpoint
+                st.info("User creation endpoint integration pending.")
+    
+    with tab2:
+        st.subheader("All Users")
+        st.write("User list will be populated after API integration.")
 
-    with tabs[1]:  # 📅 Calendar
-        col_a, col_b = st.columns(2)
-        start_d = col_a.date_input("Start Date", datetime.now())
-        end_d = col_b.date_input("End Date", datetime.now() + timedelta(days=30))
-        if st.button("📅 Load Calendar View"):
-            try:
-                params = {"start_date": start_d.strftime("%d-%m-%Y"), "end_date": end_d.strftime("%d-%m-%Y")}
-                res = requests.get(f"{API_URL}/tasks/calendar", headers=auth_headers(), params=params)
-                if res.status_code == 200:
-                    for t in res.json():
-                        st.markdown(f" **{t['title']}** | Due: `{t['due_date'][:10]}` | Status: `{t['status']}`")
+def tasks_page():
+    """Task management"""
+    st.title("📋 Task Management")
+    
+    tab1, tab2 = st.tabs(["➕ Assign Task", "📋 Task List"])
+    
+    with tab1:
+        st.subheader("Assign Task to Worker")
+        col1, col2 = st.columns(2)
+        with col1:
+            title = st.text_input("Task Title")
+            assigned_to = st.text_input("Worker Email")
+        with col2:
+            description = st.text_area("Description")
+            due_date = st.date_input("Due Date")
+        
+        if st.button("Assign Task"):
+            if title and assigned_to:
+                response = requests.post(
+                    f"{API_BASE_URL}/tasks/assign",
+                    json={
+                        "title": title,
+                        "description": description,
+                        "assigned_to_email": assigned_to,
+                        "due_date": due_date.isoformat() if due_date else None
+                    },
+                    headers=get_headers()
+                )
+                if response.status_code == 201:
+                    st.success("Task assigned successfully!")
+                    st.rerun()
                 else:
-                    st.error("Failed to load calendar")
-            except Exception as e:
-                st.error(f"API Error: {e}")
+                    st.error(f"Error: {response.json().get('detail', 'Unknown error')}")
+    
+    with tab2:
+        st.subheader("All Tasks")
+        st.write("Task list will be populated after API integration.")
 
-    with tabs[2]:  # 📊 Stats
-        if st.button("📊 Load Monthly Stats"):
-            try:
-                res = requests.get(f"{API_URL}/tasks/stats", headers=auth_headers())
-                if res.status_code == 200:
-                    s = res.json()
-                    st.metric("Total Tasks", s["total"])
-                    c1, c2, c3, c4 = st.columns(4)
-                    c1.metric("Pending", s["pending"])
-                    c2.metric("In Progress", s["in_progress"])
-                    c3.metric("Completed", s["completed"])
-                    c4.metric("Archived", s["archived"])
-                else:
-                    st.error("Failed to load stats")
-            except Exception as e:
-                st.error(f"API Error: {e}")
+# ─────────────────────────────────────
+# MAIN APP
+# ─────────────────────────────────────
+def main():
+    if not st.session_state.token:
+        login_page()
+    else:
+        menu = sidebar()
+        
+        if menu == "📊 Dashboard":
+            dashboard_page()
+        elif menu == "🏢 Organizations":
+            organizations_page()
+        elif menu == "👥 Users":
+            users_page()
+        elif menu == "📋 Tasks":
+            tasks_page()
 
-    with tabs[3]:  # 🗄️ Memory
-        if st.button("🗄️ Load Memory/Archive"):
-            try:
-                res = requests.get(f"{API_URL}/tasks/memory", headers=auth_headers())
-                if res.status_code == 200:
-                    for t in res.json():
-                        st.markdown(f"✅ **{t['title']}** | Completed: `{t.get('completed_at','N/A')[:10]}` | Status: `{t['status']}`")
-                else:
-                    st.error("Failed to load memory")
-            except Exception as e:
-                st.error(f"API Error: {e}")
-
-    with tabs[4]:  # 📤 Upload & Complete
-        task_id = st.number_input("Task ID to Complete", min_value=1, step=1)
-        uploaded = st.file_uploader("Upload Proof Photo", type=["jpg", "png", "webp"])
-        if st.button("📤 Upload & Complete"):
-            if uploaded and task_id:
-                try:
-                    # 1. Upload
-                    files = {"file": (uploaded.name, uploaded, uploaded.type)}
-                    res_up = requests.post(f"{API_URL}/upload", headers=auth_headers(), files=files)
-                    if res_up.status_code == 201:
-                        file_url = res_up.json()["file_url"]
-                        # 2. Complete
-                        res_comp = requests.patch(f"{API_URL}/tasks/{task_id}/complete", headers=auth_headers(), 
-                                                  json={"image_url": file_url})
-                        if res_comp.status_code == 200:
-                            st.success("Task completed & proof attached!")
-                        else:
-                            st.error(res_comp.json().get("detail", "Complete failed"))
-                    else:
-                        st.error(res_up.json().get("detail", "Upload failed"))
-                except Exception as e:
-                    st.error(f"API Error: {e}")
-            else:
-                st.warning("Enter Task ID and select a photo.")
+if __name__ == "__main__":
+    main()
