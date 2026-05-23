@@ -13,7 +13,7 @@ class TaskResponse(BaseModel):
     id: int
     title: str
     description: str | None
-    status: TaskStatus  # ← Enum: pending, in_progress, complete, archived
+    status: TaskStatus  # ← Enum: pending, in_progress, completed, archived
     due_date: datetime | None
     image_url: str | None
     completed_at: datetime | None

@@ -37,7 +37,7 @@ async def upload_media(
     # 5. Save the file to disk
     file_path = os.path.join(user_dir, safe_name)
     with open(file_path, "wb") as buffer:
-        buffer.write(await file.read())
+        buffer.write(contents)
     
     # 6. Return the URL or path to the uploaded media
     file_url = f"/{UPLOAD_DIR}/{current_user.id}/{safe_name}"  # Adjust as needed for your static files setup

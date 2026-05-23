@@ -1,19 +1,37 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import List
 
 class Settings(BaseSettings):
-    """Application settings."""
+    """Application settings - loaded from .env or environment variables."""
 
+    # Application
     PROJECT_NAME: str = "EHTMS"
     API_V1_PREFIX: str = "/api/v1"
-    ALLOWED_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:5173"]
-
-    DATABASE_URL: str = "postgresql://ehtms_user:ehtms_password_123@127.0.0.1:5434/ehtms_db"
-
-    SECRET_KEY : str = "development_secret_key"
+    
+    # CORS - Pydantic auto-parses JSON strings from env vars for List[str]
+    ALLOWED_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8501"]
+    
+    # Database - REQUIRED (no default = must be set in .env or env vars)
+    DATABASE_URL: str
+    
+    # Security - REQUIRED
+    SECRET_KEY: str
+    
+    # Optional with safe defaults
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    ALLOWED_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:8501"]
-
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
     
+    # File Uploads
+    UPLOAD_DIR: str = "uploads"
+    MAX_FILE_SIZE_MB: int = 5
+    
+    # Pydantic v2 configuration
+    model_config = SettingsConfigDict(
+        env_file=".env",              # Load .env file
+        env_file_encoding="utf-8",    # Encoding
+        case_sensitive=False,         # Env vars are case-insensitive
+        extra="ignore"                # Ignore unknown env vars (safe for deployment)
+    )
+
+# Create singleton instance
 settings = Settings()

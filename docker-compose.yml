@@ -1,5 +1,27 @@
-version: '3.8'
 services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env.docker
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - SECRET_KEY=${SECRET_KEY}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - uploads:/app/uploads
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 1m30s
+      timeout: 30s
+      retries: 3
+      start_period: 30s
+
   postgres:
     image: postgres:16
     environment:
@@ -10,5 +32,14 @@ services:
       - "5434:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ehtms_user -d ehtms_db -h localhost -p 5432"]
+      interval: 10s 
+      timeout: 5s
+      retries: 3
+
+
 volumes:
   pgdata:
+  uploads:

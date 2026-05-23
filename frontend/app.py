@@ -66,7 +66,7 @@ else:
     tabs = st.tabs(["📋 Tasks", " Calendar", "📊 Stats", "️ Memory", "📤 Upload & Complete"])
 
     with tabs[0]:  # 📋 Tasks
-        status_filter = st.selectbox("Filter by Status", ["all", "pending", "in_progress", "complete", "archived"])
+        status_filter = st.selectbox("Filter by Status", ["all", "pending", "in_progress", "completed", "archived"])
         if st.button(" Refresh Tasks"):
             try:
                 params = {"status_filter": status_filter} if status_filter != "all" else {}
@@ -121,7 +121,7 @@ else:
                     c1, c2, c3, c4 = st.columns(4)
                     c1.metric("Pending", s["pending"])
                     c2.metric("In Progress", s["in_progress"])
-                    c3.metric("Complete", s["complete"])
+                    c3.metric("Completed", s["completed"])
                     c4.metric("Archived", s["archived"])
                 else:
                     st.error("Failed to load stats")
