@@ -304,11 +304,7 @@ Repository: [EHTMS Tasks Application](https://github.com/omi1811/ehtms_tasks_app
 
 ---
 
-# 📄 License
 
-This project is licensed under the MIT License.
-
----
 
 # ⭐ Support
 
